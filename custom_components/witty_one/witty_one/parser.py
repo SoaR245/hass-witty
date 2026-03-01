@@ -320,19 +320,27 @@ class WittyOneDeviceData:
                 raise
 
         device = WittyOneDevice(static_information=self.static_properties)
-        (
-            device.general,
-            device.energies,
-            device.phases_states,
-            device.current_session,
-            device.charge_mode,
+
+        try:
+            (
+                device.general,
+                device.energies,
+                device.phases_states,
+                device.current_session,
+                device.charge_mode,
         ) = await asyncio.gather(
-            _read_general_state(client),
-            _read_energy(client),
-            _read_phases_state(client),
-            _current_session(client),
-            _read_charge_mode(client),
+                _read_general_state(client),
+                _read_energy(client),
+                _read_phases_state(client),
+                _current_session(client),
+                _read_charge_mode(client),
         )
+        except ParseError:
+            self.logger.exception("Fail to read dynamic info, cache cleared, try again")
+            if callable(getattr(client, "clear_cache", None)):
+                await client.clear_cache()  # pyright: ignore[reportAttributeAccessIssue]
+            raise
+
         self.logger.debug("Device data: %s", device)
         await client.disconnect()
         return device
