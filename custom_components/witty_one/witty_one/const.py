@@ -58,3 +58,13 @@ CONFIG_BADGE_UUID = _state_uuid("2180")
 
 #  MAC (6 bytes), NAME 32 bytes, STATE 1 byte
 CONFIG_ADMIN_PHONES_UUID = _state_uuid("3080")
+
+# Charge mode configuration
+# Values from Android app reverse engineering:
+#   1 = OFF/PAUSE (charging disabled)
+#   2 = NORMAL/BOOST (full power charging)
+#   3 = SLOW (reduced power charging)
+#   6 = SOLAR (solar-optimized, requires Modbus TCP energy controller)
+#   7 = SOLAR_ECO (solar eco mode, requires Modbus TCP energy controller)
+# Address verified via BLE scan - config characteristic at 4480
+CHARGE_MODE_UUID = _state_uuid("4480")  # length 1 + mode byte, format: <HB

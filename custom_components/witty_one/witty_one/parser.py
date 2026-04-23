@@ -12,6 +12,7 @@ from bleak_retry_connector import establish_connection
 
 from .const import (
     AMBIENT_TEMP_UUID,
+    CHARGE_MODE_UUID,
     ELECTRIC_STATE_UUID,
     ENERGY_UUID,
     MODEL_UUID,
@@ -77,6 +78,34 @@ class WittyOneGeneralState:
 
 
 @dataclasses.dataclass
+class WittyOneChargeMode:
+    """Charge mode configuration.
+
+    Values from Android app reverse engineering:
+        1 = OFF/PAUSE (charging disabled)
+        2 = NORMAL/BOOST (full power charging)
+        3 = SLOW (reduced power charging)
+        6 = SOLAR (solar-optimized, requires Modbus TCP)
+        7 = SOLAR_ECO (solar eco mode, requires Modbus TCP)
+    """
+
+    mode: int = 0
+    mode_name: str = "unknown"
+
+    @staticmethod
+    def mode_to_name(mode: int) -> str:
+        """Convert mode value to human-readable name."""
+        mode_names = {
+            1: "off",
+            2: "boost",
+            3: "slow",
+            6: "solar",
+            7: "solar_eco",
+        }
+        return mode_names.get(mode, "unknown")
+
+
+@dataclasses.dataclass
 class WittyOneDevice:
     """Reponse data for Witty One device."""
 
@@ -88,6 +117,9 @@ class WittyOneDevice:
     phases_states: list[WittyOnePhaseState] = dataclasses.field(default_factory=list)
     current_session: WittyCurrentSession = dataclasses.field(
         default_factory=WittyCurrentSession
+    )
+    charge_mode: WittyOneChargeMode = dataclasses.field(
+        default_factory=WittyOneChargeMode
     )
 
 
@@ -211,6 +243,26 @@ async def _read_general_state(client: BleakClient) -> WittyOneGeneralState:
     return WittyOneGeneralState(mainstate=values[1] >> 8, substate=values[1] & 0xFF)
 
 
+async def _read_charge_mode(client: BleakClient) -> WittyOneChargeMode:
+    """Read the charge mode configuration.
+
+    Returns default mode if the characteristic cannot be read.
+    """
+    try:
+        tmp = await client.read_gatt_char(CHARGE_MODE_UUID)
+        # Format: <H (length) + B (mode value)
+        values = struct.unpack_from("<HB", tmp)
+        mode = values[1]
+        return WittyOneChargeMode(
+            mode=mode,
+            mode_name=WittyOneChargeMode.mode_to_name(mode),
+        )
+    except Exception:
+        # Characteristic may not be readable without proper pairing
+        # or the address might be incorrect
+        return WittyOneChargeMode()
+
+
 async def _ambient_temp(client: BleakClient) -> float:
     tmp = await client.read_gatt_char(AMBIENT_TEMP_UUID)
     (_, value, min_value, max_value) = struct.unpack("<Hhhh", tmp)
@@ -262,11 +314,13 @@ class WittyOneDeviceData:
             device.energies,
             device.phases_states,
             device.current_session,
+            device.charge_mode,
         ) = await asyncio.gather(
             _read_general_state(client),
             _read_energy(client),
             _read_phases_state(client),
             _current_session(client),
+            _read_charge_mode(client),
         )
         self.logger.debug("Device data: %s", device)
         await client.disconnect()

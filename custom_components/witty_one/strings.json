@@ -53,6 +53,17 @@
           "reserved": "Reserved",
           "error": "Error"
         }
+      },
+      "charge_mode": {
+        "name": "Charge Mode",
+        "state": {
+          "unknown": "Unknown",
+          "off": "Off",
+          "boost": "Boost",
+          "slow": "Slow",
+          "solar": "Solar",
+          "solar_eco": "Solar Eco"
+        }
       }
     }
   }

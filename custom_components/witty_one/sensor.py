@@ -46,6 +46,16 @@ GENERAL_STATES = {
     15728640: "error",
 }
 
+# Charge mode values from Android app reverse engineering
+CHARGE_MODES = {
+    0: "unknown",
+    1: "off",
+    2: "boost",
+    3: "slow",
+    6: "solar",
+    7: "solar_eco",
+}
+
 ENTITY_DESCRIPTIONS: tuple[WittyOneSensorEntityDescription, ...] = (
     WittyOneSensorEntityDescription(
         key="total_energy",
@@ -107,6 +117,14 @@ ENTITY_DESCRIPTIONS: tuple[WittyOneSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         options=list(GENERAL_STATES.values()),
         value_fn=lambda device: GENERAL_STATES[device.general.mainstate],
+    ),
+    WittyOneSensorEntityDescription(
+        key="charge_mode",
+        translation_key="charge_mode",
+        device_class=SensorDeviceClass.ENUM,
+        options=list(CHARGE_MODES.values()),
+        value_fn=lambda device: device.charge_mode.mode_name,
+        exists_fn=lambda device: device.charge_mode.mode != 0,
     ),
 )
 

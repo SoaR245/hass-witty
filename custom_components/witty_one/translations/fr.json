@@ -34,6 +34,17 @@
                     "error": "Erreur",
                     "error_iec": "Erreur IEC"
                 }
+            },
+            "charge_mode": {
+                "name": "Mode de charge",
+                "state": {
+                    "unknown": "Inconnu",
+                    "off": "Arrêt",
+                    "boost": "Boost",
+                    "slow": "Lent",
+                    "solar": "Solaire",
+                    "solar_eco": "Solaire Éco"
+                }
             }
         }
     }
