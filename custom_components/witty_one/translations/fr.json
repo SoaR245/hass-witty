@@ -52,6 +52,21 @@
             "relay_temperature": {
                 "name": "Température relais"
             }
+        },
+        "switch": {
+            "charge_enabled": {
+                "name": "Charge activée"
+            }
+        },
+        "select": {
+            "charge_mode_select": {
+                "name": "Mode de charge",
+                "state": {
+                    "off": "Arrêt",
+                    "boost": "Boost",
+                    "slow": "Lent"
+                }
+            }
         }
     }
 }

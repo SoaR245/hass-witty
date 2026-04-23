@@ -4,7 +4,7 @@ import asyncio
 import dataclasses
 import struct
 from logging import Logger
-from typing import Any
+from typing import Any, ClassVar
 from uuid import UUID
 
 from bleak import BleakClient
@@ -89,6 +89,12 @@ class WittyOneChargeMode:
         6 = SOLAR (solar-optimized, requires Modbus TCP)
         7 = SOLAR_ECO (solar eco mode, requires Modbus TCP)
     """
+
+    MODE_OFF: ClassVar[int] = 1
+    MODE_BOOST: ClassVar[int] = 2
+    MODE_SLOW: ClassVar[int] = 3
+    MODE_SOLAR: ClassVar[int] = 6
+    MODE_SOLAR_ECO: ClassVar[int] = 7
 
     mode: int = 0
     mode_name: str = "unknown"
@@ -332,7 +338,7 @@ class WittyOneDeviceData:
                 device.charge_mode,
                 device.ambient_temp,
                 device.relay_temp,
-        ) = await asyncio.gather(
+            ) = await asyncio.gather(
                 _read_general_state(client),
                 _read_energy(client),
                 _read_phases_state(client),
@@ -340,7 +346,7 @@ class WittyOneDeviceData:
                 _read_charge_mode(client),
                 _ambient_temp(client),
                 _relay_temp(client),
-        )
+            )
         except ParseError:
             self.logger.exception("Fail to read dynamic info, cache cleared, try again")
             if callable(getattr(client, "clear_cache", None)):
@@ -350,6 +356,22 @@ class WittyOneDeviceData:
         self.logger.debug("Device data: %s", device)
         await client.disconnect()
         return device
+
+    async def write_charge_mode(self, ble_device: BLEDevice, mode: int) -> None:
+        """Write a new charge mode to the device.
+
+        Format: <H (length) + B (mode value), per Hager Witty One BLE protocol.
+        """
+        if mode not in (1, 2, 3, 6, 7):
+            msg = f"Invalid charge mode: {mode}"
+            raise ValueError(msg)
+        client = await establish_connection(BleakClient, ble_device, ble_device.address)
+        try:
+            await client.pair()
+            payload = struct.pack("<HB", 1, mode)
+            await client.write_gatt_char(CHARGE_MODE_UUID, payload, response=True)
+        finally:
+            await client.disconnect()
 
 
 def model_id_to_name(model_id: str) -> str:

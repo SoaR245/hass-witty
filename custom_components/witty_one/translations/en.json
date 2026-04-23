@@ -51,6 +51,21 @@
             "relay_temperature": {
                 "name": "Relay Temperature"
             }
+        },
+        "switch": {
+            "charge_enabled": {
+                "name": "Charging Enabled"
+            }
+        },
+        "select": {
+            "charge_mode_select": {
+                "name": "Charge Mode",
+                "state": {
+                    "off": "Off",
+                    "boost": "Boost",
+                    "slow": "Slow"
+                }
+            }
         }
     }
 }
