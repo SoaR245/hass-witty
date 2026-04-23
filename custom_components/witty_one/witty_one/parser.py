@@ -122,6 +122,8 @@ class WittyOneDevice:
     charge_mode: WittyOneChargeMode = dataclasses.field(
         default_factory=WittyOneChargeMode
     )
+    ambient_temp: float = 0.0
+    relay_temp: float = 0.0
 
 
 class ParseError(Exception):
@@ -328,12 +330,16 @@ class WittyOneDeviceData:
                 device.phases_states,
                 device.current_session,
                 device.charge_mode,
+                device.ambient_temp,
+                device.relay_temp,
         ) = await asyncio.gather(
                 _read_general_state(client),
                 _read_energy(client),
                 _read_phases_state(client),
                 _current_session(client),
                 _read_charge_mode(client),
+                _ambient_temp(client),
+                _relay_temp(client),
         )
         except ParseError:
             self.logger.exception("Fail to read dynamic info, cache cleared, try again")

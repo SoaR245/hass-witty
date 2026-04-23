@@ -10,7 +10,7 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
 )
 from homeassistant.components.sensor.const import SensorDeviceClass, SensorStateClass
-from homeassistant.const import UnitOfEnergy, UnitOfPower, UnitOfTime
+from homeassistant.const import UnitOfEnergy, UnitOfPower, UnitOfTemperature, UnitOfTime
 
 from .entity import WittyOneEntity
 
@@ -125,6 +125,22 @@ ENTITY_DESCRIPTIONS: tuple[WittyOneSensorEntityDescription, ...] = (
         options=list(CHARGE_MODES.values()),
         value_fn=lambda device: device.charge_mode.mode_name,
         exists_fn=lambda device: device.charge_mode.mode != 0,
+    ),
+    WittyOneSensorEntityDescription(
+        key="ambient_temperature",
+        translation_key="ambient_temperature",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda device: device.ambient_temp,
+    ),
+    WittyOneSensorEntityDescription(
+        key="relay_temperature",
+        translation_key="relay_temperature",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda device: device.relay_temp,
     ),
 )
 

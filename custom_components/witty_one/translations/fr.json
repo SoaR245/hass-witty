@@ -45,6 +45,12 @@
                     "solar": "Solaire",
                     "solar_eco": "Solaire Éco"
                 }
+            },
+            "ambient_temperature": {
+                "name": "Température ambiante"
+            },
+            "relay_temperature": {
+                "name": "Température relais"
             }
         }
     }
