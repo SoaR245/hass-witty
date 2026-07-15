@@ -9,13 +9,25 @@ from bleak import BleakClient
 from bleak_retry_connector import establish_connection
 
 from .const import (
+    ACCESS_CONTROL_MODE_UUID,
     AMBIENT_TEMP_UUID,
+    CAR_DETECT_UUID,
+    CHARGE_MODE_UUID,
+    CHARGING_NUMBER_UUID,
+    COMMUTATION_UUID,
+    CONFIG_CABLE_LOCK_UUID,
+    DEFAULT_CHARGE_STATE_UUID,
+    DURATIONS_UUID,
     ELECTRIC_STATE_UUID,
     ENERGY_UUID,
+    FALLBACK_CURRENT_UUID,
+    MAX_CURRENT_UUID,
     MODEL_UUID,
     NAME_UUID,
+    REDUCE_CURRENT_UUID,
     RELAY_TEMP_UUID,
     SESSION_STATE_UUID,
+    STARTUP_COUNT_UUID,
     STATE_UUID,
 )
 
@@ -81,6 +93,39 @@ class WittyOneGeneralState:
 
 
 @dataclasses.dataclass
+class WittyOneConfiguration:
+    """Charging station configuration values."""
+
+    charge_mode: int = 0
+    cable_lock: int = 0
+    access_control_mode: int = 0
+    max_current: int = 0
+    reduce_current: int = 0
+    fallback_current: int = 0
+    default_charge_state: int = 0
+
+
+@dataclasses.dataclass
+class WittyOneDiagnostics:
+    """Diagnostic values, mirroring the app's Diagnostic screen."""
+
+    ambient_temperature: float = 0.0
+    relay_temperature: float = 0.0
+    startup_counter: int = 0
+    vehicle_detection_number: int = 0
+    charging_session_number: int = 0
+    # Order inferred from IEC 61851 states (Ax/Bx/Cx-Dx/F), not verified on a
+    # real device yet. See WITTY_ONE_BLE_PROTOCOL.md section 24.2.
+    duration_no_ev_plug: int = 0
+    duration_wait_charging: int = 0
+    duration_effective_load: int = 0
+    duration_error: int = 0
+    # The wire format has 4 UInt64 slots, the app only names the first two.
+    relay4c_commutations: int = 0
+    relay_out1_commutations: int = 0
+
+
+@dataclasses.dataclass
 class WittyOneDevice:
     """Reponse data for Witty One device."""
 
@@ -92,6 +137,12 @@ class WittyOneDevice:
     phases_states: list[WittyOnePhaseState] = dataclasses.field(default_factory=list)
     current_session: WittyCurrentSession = dataclasses.field(
         default_factory=WittyCurrentSession
+    )
+    configuration: WittyOneConfiguration = dataclasses.field(
+        default_factory=WittyOneConfiguration
+    )
+    diagnostics: WittyOneDiagnostics = dataclasses.field(
+        default_factory=WittyOneDiagnostics
     )
 
 
@@ -247,6 +298,47 @@ async def _read_general_state(client: BleakClient) -> WittyOneGeneralState:
     return WittyOneGeneralState(mainstate=values[1] >> 8, substate=values[1] & 0xFF)
 
 
+async def _read_uint8(client: BleakClient, uuid: str | UUID, property_name: str) -> int:
+    tmp = await client.read_gatt_char(uuid)
+    (_, value) = _unpack_from("<HB", tmp, property_name)
+    return value
+
+
+async def _read_uint16(client: BleakClient, uuid: str | UUID, property_name: str) -> int:
+    tmp = await client.read_gatt_char(uuid)
+    (_, value) = _unpack_from("<HH", tmp, property_name)
+    return value
+
+
+async def _read_configuration(client: BleakClient) -> WittyOneConfiguration:
+    (
+        charge_mode,
+        cable_lock,
+        access_control_mode,
+        max_current,
+        reduce_current,
+        fallback_current,
+        default_charge_state,
+    ) = await asyncio.gather(
+        _read_uint8(client, CHARGE_MODE_UUID, "charge_mode"),
+        _read_uint8(client, CONFIG_CABLE_LOCK_UUID, "cable_lock"),
+        _read_uint8(client, ACCESS_CONTROL_MODE_UUID, "access_control_mode"),
+        _read_uint16(client, MAX_CURRENT_UUID, "max_current"),
+        _read_uint16(client, REDUCE_CURRENT_UUID, "reduce_current"),
+        _read_uint16(client, FALLBACK_CURRENT_UUID, "fallback_current"),
+        _read_uint8(client, DEFAULT_CHARGE_STATE_UUID, "default_charge_state"),
+    )
+    return WittyOneConfiguration(
+        charge_mode=charge_mode,
+        cable_lock=cable_lock,
+        access_control_mode=access_control_mode,
+        max_current=max_current,
+        reduce_current=reduce_current,
+        fallback_current=fallback_current,
+        default_charge_state=default_charge_state,
+    )
+
+
 async def _ambient_temp(client: BleakClient) -> float:
     tmp = await client.read_gatt_char(AMBIENT_TEMP_UUID)
     (_, value, _min_value, _max_value) = _unpack("<Hhhh", tmp, "ambient_temp")
@@ -257,6 +349,63 @@ async def _relay_temp(client: BleakClient) -> float:
     tmp = await client.read_gatt_char(RELAY_TEMP_UUID)
     (_, value, _min_value, _max_value) = _unpack("<Hhhh", tmp, "relay_temp")
     return value / 100
+
+
+async def _read_uint32(client: BleakClient, uuid: str | UUID, property_name: str) -> int:
+    tmp = await client.read_gatt_char(uuid)
+    (_, value) = _unpack_from("<HI", tmp, property_name)
+    return value
+
+
+async def _read_uint64(client: BleakClient, uuid: str | UUID, property_name: str) -> int:
+    tmp = await client.read_gatt_char(uuid)
+    (_, value) = _unpack_from("<HQ", tmp, property_name)
+    return value
+
+
+async def _read_durations(client: BleakClient) -> tuple[int, int, int, int]:
+    tmp = await client.read_gatt_char(DURATIONS_UUID)
+    values = _unpack_from("<HIIII", tmp, "durations")
+    return (values[1], values[2], values[3], values[4])
+
+
+async def _read_commutations(client: BleakClient) -> tuple[int, int]:
+    tmp = await client.read_gatt_char(COMMUTATION_UUID)
+    values = _unpack_from("<HQQQQ", tmp, "commutations")
+    return (values[1], values[2])
+
+
+async def _read_diagnostics(client: BleakClient) -> WittyOneDiagnostics:
+    (
+        ambient_temperature,
+        relay_temperature,
+        startup_counter,
+        vehicle_detection_number,
+        charging_session_number,
+        durations,
+        commutations,
+    ) = await asyncio.gather(
+        _ambient_temp(client),
+        _relay_temp(client),
+        _read_uint32(client, STARTUP_COUNT_UUID, "startup_counter"),
+        _read_uint64(client, CAR_DETECT_UUID, "vehicle_detection_number"),
+        _read_uint64(client, CHARGING_NUMBER_UUID, "charging_session_number"),
+        _read_durations(client),
+        _read_commutations(client),
+    )
+    return WittyOneDiagnostics(
+        ambient_temperature=ambient_temperature,
+        relay_temperature=relay_temperature,
+        startup_counter=startup_counter,
+        vehicle_detection_number=vehicle_detection_number,
+        charging_session_number=charging_session_number,
+        duration_wait_charging=durations[0],
+        duration_no_ev_plug=durations[1],
+        duration_effective_load=durations[2],
+        duration_error=durations[3],
+        relay4c_commutations=commutations[0],
+        relay_out1_commutations=commutations[1],
+    )
 
 
 class WittyOneDeviceData:
@@ -299,11 +448,15 @@ class WittyOneDeviceData:
                     device.energies,
                     device.phases_states,
                     device.current_session,
+                    device.configuration,
+                    device.diagnostics,
                 ) = await asyncio.gather(
                     _read_general_state(client),
                     _read_energy(client),
                     _read_phases_state(client),
                     _current_session(client),
+                    _read_configuration(client),
+                    _read_diagnostics(client),
                 )
             except ParseError:
                 self.logger.exception(
@@ -316,6 +469,17 @@ class WittyOneDeviceData:
             await client.disconnect()
 
         return device
+
+    async def write_charge_mode(self, ble_device: BLEDevice, mode: int) -> None:
+        """Write the charge mode to the device."""
+        client = await establish_connection(BleakClient, ble_device, ble_device.address)
+        try:
+            await client.pair()
+            await client.write_gatt_char(
+                CHARGE_MODE_UUID, struct.pack("<HB", 1, mode), response=True
+            )
+        finally:
+            await client.disconnect()
 
 
 def model_id_to_name(model_id: str) -> str:

@@ -34,6 +34,78 @@
                     "error": "Erreur",
                     "error_iec": "Erreur IEC"
                 }
+            },
+            "cable_lock": {
+                "name": "Verrouillage câble",
+                "state": {
+                    "not_locked": "Non verrouillé",
+                    "locked": "Verrouillé",
+                    "unlocked": "Déverrouillé",
+                    "blocked_in_locked_position": "Bloqué (verrouillé)",
+                    "blocked_in_unlocked_position": "Bloqué (déverrouillé)",
+                    "blocked": "Bloqué"
+                }
+            },
+            "access_control_mode": {
+                "name": "Mode de contrôle d'accès",
+                "state": {
+                    "anyone": "Tout le monde",
+                    "badge_only": "Badge uniquement"
+                }
+            },
+            "max_current": {
+                "name": "Courant maximum"
+            },
+            "reduce_current": {
+                "name": "Courant mode lent"
+            },
+            "fallback_current": {
+                "name": "Courant de repli"
+            },
+            "ambient_temperature": {
+                "name": "Température ambiante"
+            },
+            "relay_temperature": {
+                "name": "Température relais"
+            },
+            "startup_counter": {
+                "name": "Compteur de démarrages"
+            },
+            "vehicle_detection_number": {
+                "name": "Nombre de détections véhicule"
+            },
+            "charging_session_number": {
+                "name": "Nombre de sessions de charge"
+            },
+            "relay4c_commutations": {
+                "name": "Nombre de commutations relais 4C"
+            },
+            "relay_out1_commutations": {
+                "name": "Nombre de commutations relais OUT1"
+            },
+            "duration_no_ev_plug": {
+                "name": "Durée sans véhicule branché"
+            },
+            "duration_wait_charging": {
+                "name": "Durée en attente de charge"
+            },
+            "duration_effective_load": {
+                "name": "Durée de charge effective"
+            },
+            "duration_error": {
+                "name": "Durée en erreur"
+            }
+        },
+        "select": {
+            "charge_mode": {
+                "name": "Mode de charge",
+                "state": {
+                    "off": "Arrêt",
+                    "boost": "Boost",
+                    "slow": "Lent",
+                    "solar": "Solaire",
+                    "solar_eco": "Solaire éco"
+                }
             }
         }
     }

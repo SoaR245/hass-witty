@@ -10,7 +10,14 @@ from homeassistant.components.sensor import (
     SensorEntityDescription,
 )
 from homeassistant.components.sensor.const import SensorDeviceClass, SensorStateClass
-from homeassistant.const import UnitOfEnergy, UnitOfPower, UnitOfTime
+from homeassistant.const import (
+    EntityCategory,
+    UnitOfElectricCurrent,
+    UnitOfEnergy,
+    UnitOfPower,
+    UnitOfTemperature,
+    UnitOfTime,
+)
 
 from .entity import WittyOneEntity
 
@@ -44,6 +51,20 @@ GENERAL_STATES = {
     8: "finish",  # 2048
     16: "reserved",  # 4096
     15728640: "error",
+}
+
+CABLE_LOCK_STATES = {
+    0: "not_locked",
+    1: "locked",
+    2: "unlocked",
+    3: "blocked_in_locked_position",
+    4: "blocked_in_unlocked_position",
+    5: "blocked",
+}
+
+ACCESS_CONTROL_MODES = {
+    0: "anyone",
+    1: "badge_only",
 }
 
 ENTITY_DESCRIPTIONS: tuple[WittyOneSensorEntityDescription, ...] = (
@@ -107,6 +128,133 @@ ENTITY_DESCRIPTIONS: tuple[WittyOneSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         options=list(GENERAL_STATES.values()),
         value_fn=lambda device: GENERAL_STATES[device.general.mainstate],
+    ),
+    WittyOneSensorEntityDescription(
+        key="cable_lock",
+        translation_key="cable_lock",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        device_class=SensorDeviceClass.ENUM,
+        options=list(CABLE_LOCK_STATES.values()),
+        value_fn=lambda device: CABLE_LOCK_STATES.get(
+            device.configuration.cable_lock
+        ),
+    ),
+    WittyOneSensorEntityDescription(
+        key="access_control_mode",
+        translation_key="access_control_mode",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        device_class=SensorDeviceClass.ENUM,
+        options=list(ACCESS_CONTROL_MODES.values()),
+        value_fn=lambda device: ACCESS_CONTROL_MODES.get(
+            device.configuration.access_control_mode
+        ),
+    ),
+    WittyOneSensorEntityDescription(
+        key="max_current",
+        translation_key="max_current",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        device_class=SensorDeviceClass.CURRENT,
+        value_fn=lambda device: device.configuration.max_current,
+    ),
+    WittyOneSensorEntityDescription(
+        key="reduce_current",
+        translation_key="reduce_current",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        device_class=SensorDeviceClass.CURRENT,
+        value_fn=lambda device: device.configuration.reduce_current,
+    ),
+    WittyOneSensorEntityDescription(
+        key="fallback_current",
+        translation_key="fallback_current",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        native_unit_of_measurement=UnitOfElectricCurrent.AMPERE,
+        device_class=SensorDeviceClass.CURRENT,
+        value_fn=lambda device: device.configuration.fallback_current,
+    ),
+    WittyOneSensorEntityDescription(
+        key="ambient_temperature",
+        translation_key="ambient_temperature",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda device: device.diagnostics.ambient_temperature,
+    ),
+    WittyOneSensorEntityDescription(
+        key="relay_temperature",
+        translation_key="relay_temperature",
+        native_unit_of_measurement=UnitOfTemperature.CELSIUS,
+        device_class=SensorDeviceClass.TEMPERATURE,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda device: device.diagnostics.relay_temperature,
+    ),
+    WittyOneSensorEntityDescription(
+        key="startup_counter",
+        translation_key="startup_counter",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=lambda device: device.diagnostics.startup_counter,
+    ),
+    WittyOneSensorEntityDescription(
+        key="vehicle_detection_number",
+        translation_key="vehicle_detection_number",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=lambda device: device.diagnostics.vehicle_detection_number,
+    ),
+    WittyOneSensorEntityDescription(
+        key="charging_session_number",
+        translation_key="charging_session_number",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=lambda device: device.diagnostics.charging_session_number,
+    ),
+    WittyOneSensorEntityDescription(
+        key="relay4c_commutations",
+        translation_key="relay4c_commutations",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=lambda device: device.diagnostics.relay4c_commutations,
+    ),
+    WittyOneSensorEntityDescription(
+        key="relay_out1_commutations",
+        translation_key="relay_out1_commutations",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.TOTAL_INCREASING,
+        value_fn=lambda device: device.diagnostics.relay_out1_commutations,
+    ),
+    WittyOneSensorEntityDescription(
+        key="duration_no_ev_plug",
+        translation_key="duration_no_ev_plug",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        device_class=SensorDeviceClass.DURATION,
+        value_fn=lambda device: device.diagnostics.duration_no_ev_plug,
+    ),
+    WittyOneSensorEntityDescription(
+        key="duration_wait_charging",
+        translation_key="duration_wait_charging",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        device_class=SensorDeviceClass.DURATION,
+        value_fn=lambda device: device.diagnostics.duration_wait_charging,
+    ),
+    WittyOneSensorEntityDescription(
+        key="duration_effective_load",
+        translation_key="duration_effective_load",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        device_class=SensorDeviceClass.DURATION,
+        value_fn=lambda device: device.diagnostics.duration_effective_load,
+    ),
+    WittyOneSensorEntityDescription(
+        key="duration_error",
+        translation_key="duration_error",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        native_unit_of_measurement=UnitOfTime.SECONDS,
+        device_class=SensorDeviceClass.DURATION,
+        value_fn=lambda device: device.diagnostics.duration_error,
     ),
 )
 

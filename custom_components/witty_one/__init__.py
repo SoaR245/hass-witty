@@ -24,6 +24,7 @@ if TYPE_CHECKING:
 
 PLATFORMS: list[Platform] = [
     Platform.SENSOR,
+    Platform.SELECT,
 ]
 
 

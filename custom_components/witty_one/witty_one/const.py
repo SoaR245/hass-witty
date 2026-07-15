@@ -33,7 +33,7 @@ COMMUTATION_UUID = _state_uuid("0610")  # length 4+0x0020 format : <HQQQQ
 CAR_DETECT_UUID = _state_uuid("0710")  # length 4+0x0004 format : <HQ
 CHARGING_NUMBER_UUID = _state_uuid("0810")  # length 4+0x0004 format : <HQ
 
-CABLE_LOCK_UUID = _state_uuid("0c10")  # length 4+0x0002 format : <HH
+MOTOR_LOCK_STATE_UUID = _state_uuid("0c10")  # length 4+0x0002 format : <HH
 
 # Electric
 ENERGY_UUID = _state_uuid("4010")
@@ -53,8 +53,32 @@ SESSION_STATE_UUID = _state_uuid("6110")
 DATE_STR_UUID = _state_uuid("0120")
 
 # Config
-CONFIG_CABLE_LOCK_UUID = _state_uuid("0880")  # length 4+0x0001
+# app "cableLock" config (0=not_locked 1=locked 2=unlocked 3=blocked_locked
+# 4=blocked_unlocked 5=blocked), length 4+0x0001 format : <HB
+CONFIG_CABLE_LOCK_UUID = _state_uuid("0880")
+
+# app "accessControlMode" config (0=anyone 1=badge_only)
+# length 4+0x0001 format : <HB
+# NOTE: 2180 holds a badge slot data blob, not the access control mode itself
+ACCESS_CONTROL_MODE_UUID = _state_uuid("2080")
 CONFIG_BADGE_UUID = _state_uuid("2180")
 
 #  MAC (6 bytes), NAME 32 bytes, STATE 1 byte
 CONFIG_ADMIN_PHONES_UUID = _state_uuid("3080")
+
+# app "chargeMode" config, length 4+0x0001 format : <HB
+# 1=off 2=boost 3=slow 6=solar 7=solar_eco
+CHARGE_MODE_UUID = _state_uuid("6080")
+
+# app "reduceCurrent" (slow mode current limit, A), length 4+0x0002 format : <HH
+REDUCE_CURRENT_UUID = _state_uuid("6180")
+
+# app "defaultChargeState" config, length 4+0x0001 format : <HB
+DEFAULT_CHARGE_STATE_UUID = _state_uuid("6280")
+
+# app "maxCurrent" (max charging current, A), length 4+0x0002 format : <HH
+MAX_CURRENT_UUID = _state_uuid("0180")
+
+# app "fallbackCurrent" (current used when regulation is lost, A)
+# length 4+0x0002 format : <HH
+FALLBACK_CURRENT_UUID = _state_uuid("8180")

@@ -66,3 +66,18 @@ class WittyOneDataUpdateCoordinator(DataUpdateCoordinator[WittyOneDevice]):
         self.previsous_data = data
         self.nb_error = 0
         return data
+
+    async def async_set_charge_mode(self, mode: int) -> None:
+        """Set the charge mode on the device."""
+        address = self.config_entry.unique_id
+        if not address:
+            msg = "No address found in configuration"
+            raise ConfigEntryError(msg)
+
+        ble_device = bluetooth.async_ble_device_from_address(self.hass, address)
+        if not ble_device:
+            msg = f"Could not find Witty One device with address {address}"
+            raise ConfigEntryError(msg)
+
+        await self.witty.write_charge_mode(ble_device, mode)
+        await self.async_request_refresh()

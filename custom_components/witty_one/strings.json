@@ -53,6 +53,78 @@
           "reserved": "Reserved",
           "error": "Error"
         }
+      },
+      "cable_lock": {
+        "name": "Cable lock",
+        "state": {
+          "not_locked": "Not locked",
+          "locked": "Locked",
+          "unlocked": "Unlocked",
+          "blocked_in_locked_position": "Blocked (locked)",
+          "blocked_in_unlocked_position": "Blocked (unlocked)",
+          "blocked": "Blocked"
+        }
+      },
+      "access_control_mode": {
+        "name": "Access control mode",
+        "state": {
+          "anyone": "Anyone",
+          "badge_only": "Badge only"
+        }
+      },
+      "max_current": {
+        "name": "Max current"
+      },
+      "reduce_current": {
+        "name": "Slow mode current"
+      },
+      "fallback_current": {
+        "name": "Fallback current"
+      },
+      "ambient_temperature": {
+        "name": "Ambient temperature"
+      },
+      "relay_temperature": {
+        "name": "Relay temperature"
+      },
+      "startup_counter": {
+        "name": "Startup counter"
+      },
+      "vehicle_detection_number": {
+        "name": "Vehicle detection number"
+      },
+      "charging_session_number": {
+        "name": "Charging session number"
+      },
+      "relay4c_commutations": {
+        "name": "Relay 4C commutation number"
+      },
+      "relay_out1_commutations": {
+        "name": "Relay OUT1 commutation number"
+      },
+      "duration_no_ev_plug": {
+        "name": "Duration no EV plug"
+      },
+      "duration_wait_charging": {
+        "name": "Duration wait charging"
+      },
+      "duration_effective_load": {
+        "name": "Duration effective load"
+      },
+      "duration_error": {
+        "name": "Duration in error"
+      }
+    },
+    "select": {
+      "charge_mode": {
+        "name": "Charge mode",
+        "state": {
+          "off": "Off",
+          "boost": "Boost",
+          "slow": "Slow",
+          "solar": "Solar",
+          "solar_eco": "Solar eco"
+        }
       }
     }
   }
