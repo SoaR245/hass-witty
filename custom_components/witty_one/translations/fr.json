@@ -1,6 +1,22 @@
 {
     "config": {
+        "flow_title": "{name}",
+        "step": {
+            "user": {
+                "description": "Sélectionnez la borne Witty One à configurer.",
+                "data": {
+                    "address": "Appareil"
+                }
+            },
+            "bluetooth_confirm": {
+                "description": "Voulez-vous configurer {name} ?"
+            }
+        },
         "abort": {
+            "not_supported": "Appareil non pris en charge",
+            "no_devices_found": "Aucun appareil trouvé sur le réseau",
+            "already_in_progress": "La configuration est déjà en cours",
+            "already_configured": "L'appareil est déjà configuré",
             "single_instance_allowed": "Une seule borne Witty One peut être configurée."
         }
     },

@@ -1,6 +1,22 @@
 {
     "config": {
+        "flow_title": "{name}",
+        "step": {
+            "user": {
+                "description": "Select the Witty One charging station to configure.",
+                "data": {
+                    "address": "Device"
+                }
+            },
+            "bluetooth_confirm": {
+                "description": "Do you want to configure {name}?"
+            }
+        },
         "abort": {
+            "not_supported": "Device not supported",
+            "no_devices_found": "No devices found on the network",
+            "already_in_progress": "Configuration flow is already in progress",
+            "already_configured": "Device is already configured",
             "single_instance_allowed": "Only one Witty One charging station can be configured."
         }
     },
