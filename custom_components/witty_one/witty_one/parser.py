@@ -3,10 +3,14 @@
 import asyncio
 import dataclasses
 import struct
+import time
 from typing import TYPE_CHECKING, Any
 
 from bleak import BleakClient
-from bleak_retry_connector import establish_connection
+from bleak_retry_connector import (
+    close_stale_connections_by_address,
+    establish_connection,
+)
 
 from .const import (
     ACCESS_CONTROL_MODE_UUID,
@@ -30,8 +34,10 @@ from .const import (
     STARTUP_COUNT_UUID,
     STATE_UUID,
 )
+from .health import UpdatePhase
 
 if TYPE_CHECKING:
+    from collections.abc import Callable
     from logging import Logger
     from uuid import UUID
 
@@ -162,13 +168,21 @@ async def _read_string(client: BleakClient, uuid: str | UUID) -> str:
         raise ParseError(msg) from err
 
 
+# Session buffers carry the badge identifier, which must not reach logs.
+_REDACTED_BUFFERS = frozenset({"current_session"})
+
+
+def _dump(buffer: bytearray, property_name: str) -> str:
+    return "<redacted>" if property_name in _REDACTED_BUFFERS else buffer.hex()
+
+
 def _unpack(fmt: str, buffer: bytearray, property_name: str) -> tuple[Any, ...]:
     try:
         return struct.unpack(fmt, buffer)
     except struct.error as err:
         msg = (
             f"witty_one for {property_name} {fmt} receive "
-            f"buffer[{len(buffer)}] {buffer.hex()}"
+            f"buffer[{len(buffer)}] {_dump(buffer, property_name)}"
         )
         raise ParseError(msg) from err
 
@@ -179,22 +193,15 @@ def _unpack_from(fmt: str, buffer: bytearray, property_name: str) -> tuple[Any, 
     except struct.error as err:
         msg = (
             f"witty_one for {property_name} {fmt} receive "
-            f"buffer[{len(buffer)}] {buffer.hex()}"
+            f"buffer[{len(buffer)}] {_dump(buffer, property_name)}"
         )
         raise ParseError(msg) from err
 
 
 async def _read_static_properties(client: BleakClient) -> WittyOneStaticProperties:
-    (
-        name,
-        model,
-    ) = await asyncio.gather(
-        _read_string(client, NAME_UUID),
-        _read_string(client, MODEL_UUID),
-    )
     return WittyOneStaticProperties(
-        name=name,
-        model=model,
+        name=await _read_string(client, NAME_UUID),
+        model=await _read_string(client, MODEL_UUID),
     )
 
 
@@ -304,38 +311,31 @@ async def _read_uint8(client: BleakClient, uuid: str | UUID, property_name: str)
     return value
 
 
-async def _read_uint16(client: BleakClient, uuid: str | UUID, property_name: str) -> int:
+async def _read_uint16(
+    client: BleakClient, uuid: str | UUID, property_name: str
+) -> int:
     tmp = await client.read_gatt_char(uuid)
     (_, value) = _unpack_from("<HH", tmp, property_name)
     return value
 
 
 async def _read_configuration(client: BleakClient) -> WittyOneConfiguration:
-    (
-        charge_mode,
-        cable_lock,
-        access_control_mode,
-        max_current,
-        reduce_current,
-        fallback_current,
-        default_charge_state,
-    ) = await asyncio.gather(
-        _read_uint8(client, CHARGE_MODE_UUID, "charge_mode"),
-        _read_uint8(client, CONFIG_CABLE_LOCK_UUID, "cable_lock"),
-        _read_uint8(client, ACCESS_CONTROL_MODE_UUID, "access_control_mode"),
-        _read_uint16(client, MAX_CURRENT_UUID, "max_current"),
-        _read_uint16(client, REDUCE_CURRENT_UUID, "reduce_current"),
-        _read_uint16(client, FALLBACK_CURRENT_UUID, "fallback_current"),
-        _read_uint8(client, DEFAULT_CHARGE_STATE_UUID, "default_charge_state"),
-    )
     return WittyOneConfiguration(
-        charge_mode=charge_mode,
-        cable_lock=cable_lock,
-        access_control_mode=access_control_mode,
-        max_current=max_current,
-        reduce_current=reduce_current,
-        fallback_current=fallback_current,
-        default_charge_state=default_charge_state,
+        charge_mode=await _read_uint8(client, CHARGE_MODE_UUID, "charge_mode"),
+        cable_lock=await _read_uint8(client, CONFIG_CABLE_LOCK_UUID, "cable_lock"),
+        access_control_mode=await _read_uint8(
+            client, ACCESS_CONTROL_MODE_UUID, "access_control_mode"
+        ),
+        max_current=await _read_uint16(client, MAX_CURRENT_UUID, "max_current"),
+        reduce_current=await _read_uint16(
+            client, REDUCE_CURRENT_UUID, "reduce_current"
+        ),
+        fallback_current=await _read_uint16(
+            client, FALLBACK_CURRENT_UUID, "fallback_current"
+        ),
+        default_charge_state=await _read_uint8(
+            client, DEFAULT_CHARGE_STATE_UUID, "default_charge_state"
+        ),
     )
 
 
@@ -351,13 +351,17 @@ async def _relay_temp(client: BleakClient) -> float:
     return value / 100
 
 
-async def _read_uint32(client: BleakClient, uuid: str | UUID, property_name: str) -> int:
+async def _read_uint32(
+    client: BleakClient, uuid: str | UUID, property_name: str
+) -> int:
     tmp = await client.read_gatt_char(uuid)
     (_, value) = _unpack_from("<HI", tmp, property_name)
     return value
 
 
-async def _read_uint64(client: BleakClient, uuid: str | UUID, property_name: str) -> int:
+async def _read_uint64(
+    client: BleakClient, uuid: str | UUID, property_name: str
+) -> int:
     tmp = await client.read_gatt_char(uuid)
     (_, value) = _unpack_from("<HQ", tmp, property_name)
     return value
@@ -376,23 +380,17 @@ async def _read_commutations(client: BleakClient) -> tuple[int, int]:
 
 
 async def _read_diagnostics(client: BleakClient) -> WittyOneDiagnostics:
-    (
-        ambient_temperature,
-        relay_temperature,
-        startup_counter,
-        vehicle_detection_number,
-        charging_session_number,
-        durations,
-        commutations,
-    ) = await asyncio.gather(
-        _ambient_temp(client),
-        _relay_temp(client),
-        _read_uint32(client, STARTUP_COUNT_UUID, "startup_counter"),
-        _read_uint64(client, CAR_DETECT_UUID, "vehicle_detection_number"),
-        _read_uint64(client, CHARGING_NUMBER_UUID, "charging_session_number"),
-        _read_durations(client),
-        _read_commutations(client),
+    ambient_temperature = await _ambient_temp(client)
+    relay_temperature = await _relay_temp(client)
+    startup_counter = await _read_uint32(client, STARTUP_COUNT_UUID, "startup_counter")
+    vehicle_detection_number = await _read_uint64(
+        client, CAR_DETECT_UUID, "vehicle_detection_number"
     )
+    charging_session_number = await _read_uint64(
+        client, CHARGING_NUMBER_UUID, "charging_session_number"
+    )
+    durations = await _read_durations(client)
+    commutations = await _read_commutations(client)
     return WittyOneDiagnostics(
         ambient_temperature=ambient_temperature,
         relay_temperature=relay_temperature,
@@ -408,10 +406,36 @@ async def _read_diagnostics(client: BleakClient) -> WittyOneDiagnostics:
     )
 
 
-class WittyOneDeviceData:
-    """Data for Witty One device."""
+STATIC_INFO_HINT = (
+    "Fail to read static info, GATT cache cleared;"
+    ' try to add CONFIG_BT_GATTC_MAX_CACHE_CHAR: "80"'
+    " to sdkconfig_options if you use esphome"
+)
 
-    static_properties: WittyOneStaticProperties | None = None
+
+class WittyOneUpdateError(Exception):
+    """A BLE exchange failed at a given phase."""
+
+    def __init__(
+        self,
+        phase: UpdatePhase,
+        cause: Exception,
+        partial: WittyOneDevice | None = None,
+    ) -> None:
+        """Keep the failing phase and the values read before the failure."""
+        detail = f": {cause}" if str(cause) else ""
+        super().__init__(f"{phase}: {type(cause).__name__}{detail}")
+        self.phase = phase
+        self.partial = partial
+
+
+class WittyOneDeviceData:
+    """
+    BLE session with a Witty One device.
+
+    A single lock serializes polls and commands, so only one GATT session
+    (and one proxy slot) is used at a time.
+    """
 
     def __init__(
         self,
@@ -420,66 +444,177 @@ class WittyOneDeviceData:
         """Initialize the WittyOneDeviceData with a logger."""
         super().__init__()
         self.logger = logger
+        self.static_properties: WittyOneStaticProperties | None = None
+        self.last_mtu: int | None = None
+        self.last_connection_path: str | None = None
+        self._lock = asyncio.Lock()
 
-    async def update_device(self, ble_device: BLEDevice) -> WittyOneDevice:
-        """Update the device."""
-        client = await establish_connection(BleakClient, ble_device, ble_device.address)
+    def _log_phase(
+        self, ble_device: BLEDevice, phase: UpdatePhase, start: float
+    ) -> None:
+        self.logger.debug(
+            "%s: %s done in %.2fs", ble_device.address, phase, time.monotonic() - start
+        )
+
+    async def _connect(
+        self,
+        ble_device: BLEDevice,
+        ble_device_callback: Callable[[], BLEDevice] | None,
+    ) -> BleakClient:
+        start = time.monotonic()
         try:
-            await client.pair()
+            # Under the session lock: never closes a link still used by us.
+            await close_stale_connections_by_address(ble_device.address)
+            client = await establish_connection(
+                BleakClient,
+                ble_device,
+                ble_device.address,
+                ble_device_callback=ble_device_callback,
+            )
+        except Exception as err:
+            raise WittyOneUpdateError(UpdatePhase.CONNECT, err) from err
+        self.last_mtu = client.mtu_size
+        # Home Assistant picks the scanner itself; it is only exposed privately.
+        scanner = getattr(client, "_connected_scanner", None)
+        self.last_connection_path = getattr(scanner, "name", None)
+        self.logger.debug(
+            "%s: connected via %s, reported mtu %s",
+            ble_device.address,
+            self.last_connection_path,
+            self.last_mtu,
+        )
+        self._log_phase(ble_device, UpdatePhase.CONNECT, start)
+        return client
 
-            if self.static_properties is None:
-                try:
-                    self.static_properties = await _read_static_properties(client)
-                except Exception:
-                    self.logger.exception("Fail to read static info")
-                    self.logger.warning(
-                        'try to add CONFIG_BT_GATTC_MAX_CACHE_CHAR: "80"'
-                        " to sdkconfig_options if you use esphome"
-                    )
-                    if callable(getattr(client, "clear_cache", None)):
-                        await client.clear_cache()  # pyright: ignore[reportAttributeAccessIssue]
-                    raise
-
-            device = WittyOneDevice(static_information=self.static_properties)
-
-            try:
-                (
-                    device.general,
-                    device.energies,
-                    device.phases_states,
-                    device.current_session,
-                    device.configuration,
-                    device.diagnostics,
-                ) = await asyncio.gather(
-                    _read_general_state(client),
-                    _read_energy(client),
-                    _read_phases_state(client),
-                    _current_session(client),
-                    _read_configuration(client),
-                    _read_diagnostics(client),
-                )
-            except ParseError:
-                self.logger.exception(
-                    "Fail to read dynamic info, cache cleared, try again"
-                )
-                if callable(getattr(client, "clear_cache", None)):
-                    await client.clear_cache()  # pyright: ignore[reportAttributeAccessIssue]
-                raise
-        finally:
+    async def _disconnect(self, client: BleakClient) -> None:
+        try:
             await client.disconnect()
+        except Exception:  # must not hide the original error
+            self.logger.debug("Error while disconnecting", exc_info=True)
+
+    async def _clear_cache(self, client: BleakClient) -> None:
+        if not callable(getattr(client, "clear_cache", None)):
+            return
+        try:
+            await client.clear_cache()  # pyright: ignore[reportAttributeAccessIssue]
+        except Exception:  # must not hide the original error
+            self.logger.debug("Error while clearing the GATT cache", exc_info=True)
+
+    async def _read_unprotected(
+        self, client: BleakClient, ble_device: BLEDevice
+    ) -> WittyOneDevice:
+        """Read values the station serves without encryption."""
+        start = time.monotonic()
+        if self.static_properties is None:
+            self.static_properties = await _read_static_properties(client)
+        device = WittyOneDevice(
+            static_information=self.static_properties,
+            general=await _read_general_state(client),
+        )
+        self._log_phase(ble_device, UpdatePhase.READ_UNPROTECTED, start)
+        return device
+
+    async def _failure(
+        self,
+        client: BleakClient,
+        phase: UpdatePhase,
+        err: Exception,
+        partial: WittyOneDevice | None,
+    ) -> WittyOneUpdateError:
+        if self.static_properties is None:
+            self.logger.warning(STATIC_INFO_HINT)
+            await self._clear_cache(client)
+        elif isinstance(err, ParseError):
+            self.logger.warning("Fail to read dynamic info, cache cleared: %s", err)
+            await self._clear_cache(client)
+        if isinstance(err, ParseError) and phase == UpdatePhase.READ_PROTECTED:
+            phase = UpdatePhase.DECODE
+        return WittyOneUpdateError(phase, err, partial)
+
+    async def update_device(
+        self,
+        ble_device: BLEDevice,
+        ble_device_callback: Callable[[], BLEDevice] | None = None,
+    ) -> WittyOneDevice:
+        """
+        Read every value.
+
+        Unprotected values are read before the encryption request, so a pairing
+        failure still returns them in WittyOneUpdateError.partial.
+        """
+        async with self._lock:
+            client = await self._connect(ble_device, ble_device_callback)
+            phase = UpdatePhase.READ_UNPROTECTED
+            partial: WittyOneDevice | None = None
+            try:
+                partial = await self._read_unprotected(client, ble_device)
+
+                phase = UpdatePhase.PAIR
+                start = time.monotonic()
+                await client.pair()
+                self._log_phase(ble_device, phase, start)
+
+                phase = UpdatePhase.READ_PROTECTED
+                start = time.monotonic()
+                device = await _read_protected(client, partial)
+                self._log_phase(ble_device, phase, start)
+            except Exception as err:
+                raise await self._failure(client, phase, err, partial) from err
+            finally:
+                await self._disconnect(client)
 
         return device
 
-    async def write_charge_mode(self, ble_device: BLEDevice, mode: int) -> None:
+    async def read_unprotected(
+        self,
+        ble_device: BLEDevice,
+        ble_device_callback: Callable[[], BLEDevice] | None = None,
+    ) -> WittyOneDevice:
+        """Read only values available without encryption, without pairing."""
+        async with self._lock:
+            client = await self._connect(ble_device, ble_device_callback)
+            try:
+                return await self._read_unprotected(client, ble_device)
+            except Exception as err:
+                raise await self._failure(
+                    client, UpdatePhase.READ_UNPROTECTED, err, None
+                ) from err
+            finally:
+                await self._disconnect(client)
+
+    async def write_charge_mode(
+        self,
+        ble_device: BLEDevice,
+        mode: int,
+        ble_device_callback: Callable[[], BLEDevice] | None = None,
+    ) -> None:
         """Write the charge mode to the device."""
-        client = await establish_connection(BleakClient, ble_device, ble_device.address)
-        try:
-            await client.pair()
-            await client.write_gatt_char(
-                CHARGE_MODE_UUID, struct.pack("<HB", 1, mode), response=True
-            )
-        finally:
-            await client.disconnect()
+        async with self._lock:
+            client = await self._connect(ble_device, ble_device_callback)
+            phase = UpdatePhase.PAIR
+            try:
+                await client.pair()
+                phase = UpdatePhase.WRITE
+                await client.write_gatt_char(
+                    CHARGE_MODE_UUID, struct.pack("<HB", 1, mode), response=True
+                )
+            except Exception as err:
+                raise WittyOneUpdateError(phase, err) from err
+            finally:
+                await self._disconnect(client)
+
+
+async def _read_protected(
+    client: BleakClient, partial: WittyOneDevice
+) -> WittyOneDevice:
+    return dataclasses.replace(
+        partial,
+        energies=await _read_energy(client),
+        phases_states=await _read_phases_state(client),
+        current_session=await _current_session(client),
+        configuration=await _read_configuration(client),
+        diagnostics=await _read_diagnostics(client),
+    )
 
 
 def model_id_to_name(model_id: str) -> str:

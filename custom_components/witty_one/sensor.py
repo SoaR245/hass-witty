@@ -20,6 +20,7 @@ from homeassistant.const import (
 )
 
 from .entity import WittyOneEntity
+from .witty_one.health import UpdatePhase
 
 if TYPE_CHECKING:
     from collections.abc import Callable
@@ -41,6 +42,14 @@ class WittyOneSensorEntityDescription(SensorEntityDescription):
 
     exists_fn: Callable[[WittyOneDevice], bool] = lambda _: True
     value_fn: Callable[[WittyOneDevice], datetime | StateType]
+    protected: bool = True
+
+
+@dataclass(frozen=True, kw_only=True)
+class WittyOneHealthSensorEntityDescription(SensorEntityDescription):
+    """Describes a sensor about the BLE link itself."""
+
+    value_fn: Callable[[WittyOneDataUpdateCoordinator], datetime | StateType]
 
 
 GENERAL_STATES = {
@@ -128,6 +137,7 @@ ENTITY_DESCRIPTIONS: tuple[WittyOneSensorEntityDescription, ...] = (
         device_class=SensorDeviceClass.ENUM,
         options=list(GENERAL_STATES.values()),
         value_fn=lambda device: GENERAL_STATES[device.general.mainstate],
+        protected=False,
     ),
     WittyOneSensorEntityDescription(
         key="cable_lock",
@@ -135,9 +145,7 @@ ENTITY_DESCRIPTIONS: tuple[WittyOneSensorEntityDescription, ...] = (
         entity_category=EntityCategory.DIAGNOSTIC,
         device_class=SensorDeviceClass.ENUM,
         options=list(CABLE_LOCK_STATES.values()),
-        value_fn=lambda device: CABLE_LOCK_STATES.get(
-            device.configuration.cable_lock
-        ),
+        value_fn=lambda device: CABLE_LOCK_STATES.get(device.configuration.cable_lock),
     ),
     WittyOneSensorEntityDescription(
         key="access_control_mode",
@@ -258,6 +266,44 @@ ENTITY_DESCRIPTIONS: tuple[WittyOneSensorEntityDescription, ...] = (
     ),
 )
 
+HEALTH_DESCRIPTIONS: tuple[WittyOneHealthSensorEntityDescription, ...] = (
+    WittyOneHealthSensorEntityDescription(
+        key="last_successful_update",
+        translation_key="last_successful_update",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=lambda coordinator: coordinator.health.last_success,
+    ),
+    WittyOneHealthSensorEntityDescription(
+        key="consecutive_errors",
+        translation_key="consecutive_errors",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        state_class=SensorStateClass.MEASUREMENT,
+        value_fn=lambda coordinator: coordinator.health.consecutive_errors,
+    ),
+    WittyOneHealthSensorEntityDescription(
+        key="last_failure_phase",
+        translation_key="last_failure_phase",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        device_class=SensorDeviceClass.ENUM,
+        options=["none", *UpdatePhase],
+        value_fn=lambda coordinator: coordinator.health.last_error_phase or "none",
+    ),
+    WittyOneHealthSensorEntityDescription(
+        key="next_pairing_attempt",
+        translation_key="next_pairing_attempt",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        device_class=SensorDeviceClass.TIMESTAMP,
+        value_fn=lambda coordinator: coordinator.health.next_pairing_attempt,
+    ),
+    WittyOneHealthSensorEntityDescription(
+        key="connection_path",
+        translation_key="connection_path",
+        entity_category=EntityCategory.DIAGNOSTIC,
+        value_fn=lambda coordinator: coordinator.connection_path,
+    ),
+)
+
 
 async def async_setup_entry(
     hass: HomeAssistant,  # noqa: ARG001 Unused function argument: `hass`
@@ -274,6 +320,10 @@ async def async_setup_entry(
         for entity_description in ENTITY_DESCRIPTIONS
         if entity_description.exists_fn(coordinator.data)
     )
+    async_add_entities(
+        WittyOneHealthSensor(coordinator, entity_description)
+        for entity_description in HEALTH_DESCRIPTIONS
+    )
 
 
 class WittyOneSensor(WittyOneEntity, SensorEntity):
@@ -287,10 +337,39 @@ class WittyOneSensor(WittyOneEntity, SensorEntity):
         entity_description: WittyOneSensorEntityDescription,
     ) -> None:
         """Initialize the sensor class."""
-        super().__init__(coordinator, entity_description.key)
+        super().__init__(
+            coordinator,
+            entity_description.key,
+            protected=entity_description.protected,
+        )
         self.entity_description = entity_description
 
     @property
     def native_value(self) -> datetime | StateType:
         """Return the native value of the sensor."""
         return self.entity_description.value_fn(self.coordinator.data)
+
+
+class WittyOneHealthSensor(WittyOneEntity, SensorEntity):
+    """Sensor describing the BLE link, available even when the station is not."""
+
+    entity_description: WittyOneHealthSensorEntityDescription
+
+    def __init__(
+        self,
+        coordinator: WittyOneDataUpdateCoordinator,
+        entity_description: WittyOneHealthSensorEntityDescription,
+    ) -> None:
+        """Initialize the sensor class."""
+        super().__init__(coordinator, entity_description.key, protected=False)
+        self.entity_description = entity_description
+
+    @property
+    def available(self) -> bool:
+        """Return True: link health is known even when the poll failed."""
+        return True
+
+    @property
+    def native_value(self) -> datetime | StateType:
+        """Return the native value of the sensor."""
+        return self.entity_description.value_fn(self.coordinator)

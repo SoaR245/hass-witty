@@ -19,6 +19,14 @@ ignore = [
 [lint.flake8-pytest-style]
 fixture-parentheses = false
 
+[lint.per-file-ignores]
+"tests/**" = [
+    "D",       # test names describe the behavior
+    "INP001",  # tests are not a package
+    "PLR2004", # expected values are literals
+    "S101",    # pytest assertions
+]
+
 [lint.pyupgrade]
 keep-runtime-typing = true
 

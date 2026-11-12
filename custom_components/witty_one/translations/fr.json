@@ -1,4 +1,9 @@
 {
+    "config": {
+        "abort": {
+            "single_instance_allowed": "Une seule borne Witty One peut être configurée."
+        }
+    },
     "entity": {
         "sensor": {
             "total_energy": {
@@ -94,6 +99,31 @@
             },
             "duration_error": {
                 "name": "Durée en erreur"
+            },
+            "last_successful_update": {
+                "name": "Dernière mise à jour réussie"
+            },
+            "consecutive_errors": {
+                "name": "Erreurs de mise à jour consécutives"
+            },
+            "last_failure_phase": {
+                "name": "Phase du dernier échec",
+                "state": {
+                    "none": "Aucune",
+                    "discovery": "Borne non détectée",
+                    "connect": "Connexion",
+                    "read_unprotected": "Lecture non protégée",
+                    "pair": "Chiffrement / appairage",
+                    "read_protected": "Lecture protégée",
+                    "decode": "Décodage",
+                    "write": "Écriture"
+                }
+            },
+            "next_pairing_attempt": {
+                "name": "Prochaine tentative de chiffrement"
+            },
+            "connection_path": {
+                "name": "Chemin de connexion Bluetooth"
             }
         },
         "select": {
@@ -107,6 +137,12 @@
                     "solar_eco": "Solaire éco"
                 }
             }
+        }
+    },
+    "issues": {
+        "pairing_required": {
+            "title": "La Witty One {name} refuse la connexion chiffrée",
+            "description": "Home Assistant n'arrive pas à chiffrer la liaison Bluetooth avec {name}. Seul l'état de charge est encore mis à jour ; les autres valeurs sont indisponibles.\n\nMettez la borne en mode appairage avec un badge administrateur (voyant bleu clignotant). L'intégration réessaie avec un délai croissant (jusqu'à 30 minutes) ; l'heure de la prochaine tentative est indiquée par le capteur « Prochaine tentative de chiffrement ». Ce problème disparaît après la prochaine mise à jour réussie."
         }
     }
 }

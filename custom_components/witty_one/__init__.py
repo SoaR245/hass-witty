@@ -7,13 +7,13 @@ https://github.com/ngraziano/hass-witty
 
 from __future__ import annotations
 
-from datetime import timedelta
 from typing import TYPE_CHECKING
 
 from homeassistant.const import Platform
+from homeassistant.helpers import issue_registry as ir
 from homeassistant.loader import async_get_loaded_integration
 
-from .const import DOMAIN, LOGGER
+from .const import DOMAIN
 from .coordinator import WittyOneDataUpdateCoordinator
 from .data import WittyOneData
 
@@ -34,12 +34,7 @@ async def async_setup_entry(
     entry: WittyOneConfigEntry,
 ) -> bool:
     """Set up this integration using UI."""
-    coordinator = WittyOneDataUpdateCoordinator(
-        hass=hass,
-        logger=LOGGER,
-        name=DOMAIN,
-        update_interval=timedelta(minutes=1),
-    )
+    coordinator = WittyOneDataUpdateCoordinator(hass, entry)
 
     entry.runtime_data = WittyOneData(
         integration=async_get_loaded_integration(hass, entry.domain),
@@ -60,6 +55,7 @@ async def async_unload_entry(
     entry: WittyOneConfigEntry,
 ) -> bool:
     """Handle removal of an entry."""
+    ir.async_delete_issue(hass, DOMAIN, entry.runtime_data.coordinator.pairing_issue_id)
     return await hass.config_entries.async_unload_platforms(entry, PLATFORMS)
 
 

@@ -1,4 +1,9 @@
 {
+    "config": {
+        "abort": {
+            "single_instance_allowed": "Only one Witty One charging station can be configured."
+        }
+    },
     "entity": {
         "sensor": {
             "total_energy": {
@@ -93,6 +98,31 @@
             },
             "duration_error": {
                 "name": "Duration in error"
+            },
+            "last_successful_update": {
+                "name": "Last successful update"
+            },
+            "consecutive_errors": {
+                "name": "Consecutive update errors"
+            },
+            "last_failure_phase": {
+                "name": "Last failure phase",
+                "state": {
+                    "none": "None",
+                    "discovery": "Device not seen",
+                    "connect": "Connection",
+                    "read_unprotected": "Unprotected read",
+                    "pair": "Encryption / pairing",
+                    "read_protected": "Protected read",
+                    "decode": "Decoding",
+                    "write": "Write"
+                }
+            },
+            "next_pairing_attempt": {
+                "name": "Next encryption attempt"
+            },
+            "connection_path": {
+                "name": "Bluetooth connection path"
             }
         },
         "select": {
@@ -106,6 +136,12 @@
                     "solar_eco": "Solar eco"
                 }
             }
+        }
+    },
+    "issues": {
+        "pairing_required": {
+            "title": "Witty One {name} refuses the encrypted connection",
+            "description": "Home Assistant cannot encrypt the Bluetooth link with {name}. Only the charging state is still updated; other values are unavailable.\n\nPut the station in pairing mode with an admin badge (blue LED blinking). The integration retries with an increasing delay (up to 30 minutes); the next attempt time is shown by the \"Next encryption attempt\" sensor. This issue disappears after the next successful update."
         }
     }
 }

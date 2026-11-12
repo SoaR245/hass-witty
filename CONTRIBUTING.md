@@ -56,6 +56,13 @@ Home Assistant instance running and already configured with the included
 [`configuration.yaml`](./config/configuration.yaml)
 file.
 
+The BLE session and the coordinator poll policy have unit tests that use fakes
+instead of a running Home Assistant or a charging station:
+
+```sh
+python3 -m pytest tests
+```
+
 ## License
 
 By contributing, you agree that your contributions will be licensed under its MIT License.

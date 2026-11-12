@@ -51,6 +51,21 @@ bluetooth_proxy:
   active: True
 ```
 
+### Connection health and pairing
+
+Only one charging station can be configured.
+
+The charging state is read before the encrypted link is requested, so it keeps updating
+when encryption fails. Other values need encryption: after 3 polls without them they
+become unavailable.
+
+When the station refuses encryption (for example `smp_rsp_timeout` in the ESPHome logs),
+the integration waits 1, 5, 15 then 30 minutes between encryption requests instead of
+retrying every minute, and after two failures a repair issue asks to put the station in
+pairing mode with the card. Diagnostic sensors show the last successful update, the number
+of consecutive errors, the failing phase, the next encryption attempt and the Bluetooth
+proxy used. Use "Download diagnostics" on the integration to attach them to an issue.
+
 ## Installation
 
 
